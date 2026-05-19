@@ -1,0 +1,23 @@
+[tool.poetry]
+package-mode = false
+
+[[tool.poetry.source]]
+name = "tsinghua"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple/"
+priority = "primary"
+
+[tool.poetry.dependencies]
+python = "^3.14"
+celery = "^5.6.3"
+kombu = "^5.6.2"
+gevent = "^26.4.0"
+fastapi = "^0.136.1"
+pydantic-settings = "^2.14.1"
+uvicorn = {extras = ["standard"], version = "^0.47.0"}
+flower = "^2.0.1"
+structlog = "^25.5.0"
+redis = "^7.4.0"
+rich = "^15.0.0"
+colorama = "^0.4.6"
+
+[tool.poetry.group.dev.dependencies]
