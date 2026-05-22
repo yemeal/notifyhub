@@ -1,4 +1,5 @@
 from celery import Celery
+from kombu import Exchange, Queue
 
 from src.app.core.logging import setup_logging
 from src.app.core.settings import get_settings
@@ -24,4 +25,27 @@ celery = Celery(
         "src.app.tasks.email",
         "src.app.tasks.reports",
     ],
+)
+
+# Создаем обменник user events типа фанаут
+# Fanout как раз и позволяет всем очередям получать копию сообщдения
+user_events_exchange = Exchange("user_events", type="fanout")
+
+# создаем очереди с выше созданному обменнику и ключом маршрутизации
+celery.conf.task_queues = (
+    Queue(
+        "user.email",
+        exchange=user_events_exchange,
+        routing_key="user.email",
+    ),
+    Queue(
+        "user.analytics",
+        exchange=user_events_exchange,
+        routing_key="user.analytics",
+    ),
+    Queue(
+        "user.slack",
+        exchange=user_events_exchange,
+        routing_key="user.slack",
+    ),
 )
