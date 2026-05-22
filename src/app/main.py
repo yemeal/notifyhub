@@ -6,6 +6,8 @@ from fastapi import FastAPI
 from src.app.core.logging import setup_logging
 from src.app.core.middleware import RequestIdMiddleware
 from src.app.core.settings import get_settings
+from src.app.api.v1.notifications.email import router as email_router
+from src.app.api.v1.tasks import router as tasks_router
 
 settings = get_settings()
 
@@ -22,6 +24,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(RequestIdMiddleware)
+
+app.include_router(email_router)
+app.include_router(tasks_router)
 
 
 @app.get("/ping")

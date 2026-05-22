@@ -9,7 +9,7 @@ COPY pyproject.toml poetry.lock ./
 
 RUN poetry config virtualenvs.create false \
     && poetry config certificates.tsinghua.cert false \
-    && poetry install --no-interaction --no-ansi --no-root --without dev
+    && poetry install --no-interaction --no-ansi --no-root
 
 COPY . .
 
