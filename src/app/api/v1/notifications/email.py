@@ -47,7 +47,7 @@ async def get_email_task_status_from_database(
         await session.execute(
             select(EmailTaskModel).where(EmailTaskModel.id == email_task_id)
         )
-    ).scalar()
+    ).scalar_one_or_none()
 
     if not res:
         raise HTTPException(

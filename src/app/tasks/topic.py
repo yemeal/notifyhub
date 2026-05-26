@@ -3,21 +3,9 @@ import re
 import structlog
 
 from src.app.tasks.celery_app import celery
+from src.app.tasks.celery_app import bind_structlog_contextvars_for_task
 
 logger = structlog.get_logger()
-
-
-def bind_structlog_contextvars_for_task(
-    task_instance: celery.Celery,
-    **kwargs,
-) -> None:
-    structlog.contextvars.clear_contextvars()
-    structlog.contextvars.bind_contextvars(
-        task_id=task_instance.request.id,
-        worker_name=task_instance.request.hostname,
-        request_id=task_instance.request.headers.get("X-Request-Id"),
-        **kwargs,
-    )
 
 
 def amqp_match(pattern: str, routing_key: str) -> bool:

@@ -1,5 +1,6 @@
 from celery import Celery
 from kombu import Exchange, Queue
+import structlog
 
 from src.app.core.logging import setup_logging
 from src.app.core.settings import get_settings
@@ -73,4 +74,20 @@ celery.conf.task_queues = (
         exchange=notifications_exchange,
         routing_key="notifications.sms.normal",
     ),
+    # ВАЖНО: если мы задаем кастомные очереди, селери перстает слушать деволтную очередь "celery",
+    # в которую попадают задачи без кастомного exchange (если ее не добавить, воркер не увидит эти задачи)
+    Queue("celery"),
 )
+
+
+def bind_structlog_contextvars_for_task(
+    task_instance: Celery,
+    **kwargs,
+) -> None:
+    structlog.contextvars.clear_contextvars()
+    structlog.contextvars.bind_contextvars(
+        task_id=task_instance.request.id,
+        worker_name=task_instance.request.hostname,
+        request_id=task_instance.request.headers.get("X-Request-Id"),
+        **kwargs,
+    )
