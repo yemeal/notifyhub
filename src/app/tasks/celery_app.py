@@ -24,14 +24,21 @@ celery = Celery(
         "src.app.tasks.broadcast",
         "src.app.tasks.email",
         "src.app.tasks.reports",
+        "src.app.tasks.topic",
     ],
 )
 
 # Создаем обменник user events типа фанаут
 # Fanout как раз и позволяет всем очередям получать копию сообщдения
+# pub/sub для всех подписчиков без исключения и без фильтрации (игнорим routing_key)
 user_events_exchange = Exchange("user_events", type="fanout")
 
-# создаем очереди с выше созданному обменнику и ключом маршрутизации
+# создаем обменник типа топик, для того, чтобы реализовать
+# pub/sub, где подписчики выбирают какие подкатегории получать (гибкая фильтрация на стороне брокера)
+# (через маски `* - only one` и `# - zero or more`)
+notifications_exchange = Exchange("notifications", type="topic")
+
+# создаем очереди с выше созданными обменниками и ключом маршрутизации
 celery.conf.task_queues = (
     Queue(
         "user.email",
@@ -47,5 +54,23 @@ celery.conf.task_queues = (
         "user.slack",
         exchange=user_events_exchange,
         routing_key="user.slack",
+    ),
+    # все critical, где ключ состоит из трех слов
+    Queue(
+        "queue_all_critical",
+        exchange=notifications_exchange,
+        routing_key="*.*.critical",
+    ),
+    # все email, вне зависимости от приоритета
+    Queue(
+        "queue_email_all",
+        exchange=notifications_exchange,
+        routing_key="notifications.email.#",
+    ),
+    # смс только с нормал приорити
+    Queue(
+        "queue_sms_normal",
+        exchange=notifications_exchange,
+        routing_key="notifications.sms.normal",
     ),
 )
