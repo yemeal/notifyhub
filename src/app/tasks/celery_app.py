@@ -26,6 +26,7 @@ celery = Celery(
         "src.app.tasks.email",
         "src.app.tasks.reports",
         "src.app.tasks.topic",
+        "src.app.tasks.dlq",
     ],
 )
 
@@ -38,6 +39,8 @@ user_events_exchange = Exchange("user_events", type="fanout")
 # pub/sub, где подписчики выбирают какие подкатегории получать (гибкая фильтрация на стороне брокера)
 # (через маски `* - only one` и `# - zero or more`)
 notifications_exchange = Exchange("notifications", type="topic")
+
+notifications_dead_letter_exchange = Exchange("notifications.dlx", type="topic")
 
 # создаем очереди с выше созданными обменниками и ключом маршрутизации
 celery.conf.task_queues = (
@@ -65,8 +68,13 @@ celery.conf.task_queues = (
     # все email, вне зависимости от приоритета
     Queue(
         "queue_email_all",
-        exchange=notifications_exchange,
+        exchange=notifications_exchange,  # основной exchange
         routing_key="notifications.email.#",
+        queue_arguments={
+            "x-dead-letter-exchange": "notifications.dlx",  # куда отправляем мертвые
+            "x-dead-letter-routing-key": "notifications.dlq.emails",  # с каким ключом роутинга
+            "x-message-ttl": 86400000,  # сколько будет жить мервтое сообщение
+        },
     ),
     # смс только с нормал приорити
     Queue(
@@ -77,6 +85,11 @@ celery.conf.task_queues = (
     # ВАЖНО: если мы задаем кастомные очереди, селери перстает слушать деволтную очередь "celery",
     # в которую попадают задачи без кастомного exchange (если ее не добавить, воркер не увидит эти задачи)
     Queue("celery"),
+    Queue(
+        "notifications.dlq",
+        exchange=notifications_dead_letter_exchange,
+        routing_key="notifications.dlq.#",
+    ),
 )
 
 

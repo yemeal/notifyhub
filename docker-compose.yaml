@@ -96,7 +96,7 @@ services:
     container_name: flower
     restart: always
     ports:
-      - "5555:5555"
+      - "15555:5555"
     env_file:
       - .env
     depends_on:
@@ -107,6 +107,24 @@ services:
       redis:
         condition: service_healthy
     command: celery -A src.app.tasks.celery_app flower --port=5555
+
+  notifyhub-dlq-worker:
+    build: .
+    hostname: notifyhub-dlq-worker
+    container_name: notifyhub-dlq-worker
+    restart: always
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: celery -A src.app.tasks.celery_app worker --loglevel=info -Q notifications.dlq -n dlq-worker@%h
 
 
 volumes:

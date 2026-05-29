@@ -153,6 +153,24 @@ def send_email(self, email_task_id: str) -> dict | None:
                 logger.error(
                     "email_failed_max_retries_exceeded", total_attempts=attempt + 1
                 )
+
+                # отправляем в dead letter queue
+                from src.app.tasks.dlq import process_dead_letter
+
+                process_dead_letter.apply_async(
+                    args=[
+                        {
+                            "original_task_id": self.request.id,
+                            "task_name": "tasks.send_email",
+                            "args": [email_task_id],
+                            "kwargs": {},
+                            "error_message": str(exc),
+                            "failure_count": attempt + 1,
+                        }
+                    ],
+                    queue="notifications.dlq",
+                )
+
                 raise exc
 
             raise self.retry(
