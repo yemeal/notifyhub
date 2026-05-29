@@ -74,3 +74,26 @@ def notify_slack_team(self, user_id: str, email: str, name: str) -> None:
     logger.info("notify_slack_team_started")
     logger.error("notify_slack_team_failed_deliberately")
     raise ValueError("Deliberate error in Slack notification task")
+
+
+@celery.task(bind=True, name="tasks.broadcast.send_bulk_promo")
+def send_bulk_promo(self, recipients: list[str], subject: str, body: str) -> dict:
+    structlog.contextvars.clear_contextvars()
+    structlog.contextvars.bind_contextvars(
+        task_id=self.request.id,
+        worker_name=self.request.hostname,
+        request_id=self.request.headers.get("X-Request-Id"),
+    )
+
+    logger.info("send_bulk_promo_started", recipient_count=len(recipients))
+
+    sent_count = 0
+    for recipient in recipients:
+        # имитация отправки, в реальности тут будет SMTP/API вызов
+        time.sleep(0.2)
+        sent_count += 1
+        logger.info("bulk_promo_sent_to", recipient=recipient, progress=f"{sent_count}/{len(recipients)}")
+
+    logger.info("send_bulk_promo_completed", sent_count=sent_count)
+    return {"sent_count": sent_count, "total": len(recipients)}
+

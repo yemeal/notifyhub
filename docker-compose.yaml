@@ -5,7 +5,7 @@ services:
     container_name: rabbitmq
     restart: always
     ports:
-      - "5672:5672"
+      - "25672:5672"
       - "15672:15672"
     environment:
       RABBITMQ_DEFAULT_USER: "guest"
@@ -71,10 +71,12 @@ services:
       - .:/app
     command: uvicorn src.app.main:app --host 0.0.0.0 --port 8000
 
-  notifyhub-worker:
+  # дефолтный воркер - обслуживает существующие очереди из предыдущих задач
+  # без него задачи без явного routing (send_email, broadcast, topic) не будут обработаны
+  worker-default:
     build: .
-    hostname: notifyhub-worker
-    container_name: notifyhub-worker
+    hostname: worker-default
+    container_name: worker-default
     restart: always
     env_file:
       - .env
@@ -87,7 +89,86 @@ services:
         condition: service_healthy
     volumes:
       - .:/app
-    command: celery -A src.app.tasks.celery_app worker --loglevel=info
+    command: >
+      celery -A src.app.tasks.celery_app worker
+      --loglevel=info
+      -Q celery,user.email,user.analytics,user.slack,queue_all_critical,queue_email_all,queue_sms_normal
+      -n default@%h
+
+  # срочные уведомления (OTP, сброс пароля)
+  # concurrency=4 потому что OTP - это I/O (SMTP/HTTP), 4 параллельных задачи хватает
+  worker-critical:
+    build: .
+    hostname: worker-critical
+    container_name: worker-critical
+    restart: always
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: >
+      celery -A src.app.tasks.celery_app worker
+      --loglevel=info
+      -Q notifications.critical
+      -c 4
+      -n critical@%h
+      --prefetch-multiplier=1
+
+  # массовые рассылки - не срочные, не должны мешать critical
+  # concurrency=2 чтобы не перегружать SMTP сервер
+  worker-bulk:
+    build: .
+    hostname: worker-bulk
+    container_name: worker-bulk
+    restart: always
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: >
+      celery -A src.app.tasks.celery_app worker
+      --loglevel=info
+      -Q notifications.bulk
+      -c 2
+      -n bulk@%h
+
+  # тяжелые отчеты - concurrency=1 чтобы не грузить базу параллельными агрегациями
+  worker-reports:
+    build: .
+    hostname: worker-reports
+    container_name: worker-reports
+    restart: always
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: >
+      celery -A src.app.tasks.celery_app worker
+      --loglevel=info
+      -Q reports.heavy
+      -c 1
+      -n reports@%h
 
 
   flower:
@@ -126,7 +207,33 @@ services:
       - .:/app
     command: celery -A src.app.tasks.celery_app worker --loglevel=info -Q notifications.dlq -n dlq-worker@%h
 
+  # beat - планировщик периодических задач
+  # ВАЖНО: только один экземпляр! два beat = дублирование задач
+  # beat только ставит задачи в очередь по расписанию, выполняет их воркер
+  celery-beat:
+    build: .
+    hostname: celery-beat
+    container_name: celery-beat
+    restart: always
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - celerybeat-data:/app/data
+    command: >
+      celery -A src.app.tasks.celery_app beat
+      --loglevel=info
+      --schedule=/app/data/celerybeat-schedule
+
 
 volumes:
   rabbitmq-data:
   pg_data:
+  celerybeat-data:

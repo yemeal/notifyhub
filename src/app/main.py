@@ -11,6 +11,9 @@ from src.app.api.v1.tasks import router as tasks_router
 from src.app.api.v1.events import router as events_router
 from src.app.api.v1.topic import router as topic_router
 from src.app.api.v1.dlq import router as dlq_router
+from src.app.api.v1.otp import router as otp_router
+from src.app.api.v1.promo import router as promo_router
+from src.app.api.v1.reports import router as reports_router
 
 settings = get_settings()
 
@@ -33,6 +36,9 @@ app.include_router(tasks_router)
 app.include_router(events_router)
 app.include_router(topic_router)
 app.include_router(dlq_router)
+app.include_router(otp_router)
+app.include_router(promo_router)
+app.include_router(reports_router)
 
 
 @app.get("/ping")

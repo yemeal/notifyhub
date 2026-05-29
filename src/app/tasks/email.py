@@ -176,3 +176,18 @@ def send_email(self, email_task_id: str) -> dict | None:
             raise self.retry(
                 exc=exc, countdown=countdown, max_retries=max_retries_limit
             )
+
+
+@celery.task(bind=True, name="tasks.email.send_otp")
+def send_otp(self, user_id: str, otp_code: str) -> dict:
+    bind_structlog_contextvars_for_task(self, user_id=user_id)
+
+    logger.info("send_otp_started", user_id=user_id)
+
+    # в реальности тут отправка через SMS/Email провайдер
+    import time
+    time.sleep(0.5)
+
+    logger.info("send_otp_completed", user_id=user_id, otp_code=otp_code)
+    return {"user_id": user_id, "otp_code": otp_code, "status": "sent"}
+
